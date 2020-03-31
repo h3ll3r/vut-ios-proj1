@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+
 
 # set -x
 # set -v
@@ -41,29 +41,40 @@ shift $((OPTIND-1))
 
 # Check if DIR set
 if [ $1 ]; then 
+    if [ ! -e $1 ]; then
+        raise_error "Directory $ROOT_DIR does not exist"
+    elif [ ! -d $ROOT_DIR ]; then
+        raise_error "$ROOT_DIR is not a directory"
+    fi
     ROOT_DIR=`cd $1 && pwd` # Get absolute path to dir
 fi
 
-# If directory does not exist exit program with error
-if [ ! -e $ROOT_DIR ]; then
-    raise_error "Directory $ROOT_DIR does not exist"
-elif [ ! -d $ROOT_DIR ]; then
-    raise_error "$ROOT_DIR is not a directory"
-fi
-
 # If FILE_ERE covers root directory name
-if [ -n $FILE_ERE ] && [ $(basename "$ROOT_DIR" | egrep "$FILE_ERE" >/dev/null) ]; then
+if [ -n "$FILE_ERE" ] && $(basename "$ROOT_DIR" | egrep "$FILE_ERE" >/dev/null); then
     raise_error "Ignore ERE cannot cover root directory name"
 fi
 
-
 IFS=$'\n'
 
-if [ -z $FILE_ERE ]; then
-    FILES=$(find $ROOT_DIR -type f 2>/dev/null)
-    if [ $? -eq 1 ]; then IS_ERROR=true; fi
+FILES=$(find $ROOT_DIR \( -type f -o -type d \) 2>/dev/null)
+if [ $? -eq 1 ]; then IS_ERROR=true; fi
 
-    for FILE in $FILES; do
+for FILE in $FILES; do
+    IS_IGNORE=false
+    if [ -n "$FILE_ERE" ]; then
+        IFS=/
+        for SEGMENT in ${FILE:$((${#ROOT_DIR}+1))}; do
+            if echo "$SEGMENT" | egrep "$FILE_ERE" >/dev/null; then
+                IS_IGNORE=true
+            fi
+        done
+        IFS=$'\n'
+    fi
+
+    if [ "$IS_IGNORE" = "true" ]; then continue; fi
+
+    if [ -f $FILE ]; then
+        echo "* Counting file: $FILE"
         ((NF++))
         fsize=$(wc -c $FILE | awk '{print $1}')
 
@@ -86,15 +97,13 @@ if [ -z $FILE_ERE ]; then
         elif [ $fsize -ge 1073741824 ]; then
             ((ge1GiB++))
         fi
-    done
 
-    FILES=$(find $ROOT_DIR -type d 2>/dev/null)
-    if [ $? -eq 1 ]; then IS_ERROR=true; fi
-
-    for FILE in $FILES; do
+    elif [ -d $FILE ]; then
+        echo "* Counting dir: $FILE"
         ((ND++))
-    done
-fi
+    fi
+done
+
 
 # If normalize option triggered
 if [ "$NORMALIZE" = "true" ]
