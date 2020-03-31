@@ -1,0 +1,145 @@
+#!/usr/bin/env bash
+
+# set -x
+# set -v
+
+ROOT_DIR=$PWD
+FILE_ERE=""
+NORMALIZE=false
+IS_ERROR=false
+
+lt100B=0   # <100 B
+lt1KiB=0   # <1 KiB
+lt10KiB=0  # <10 KiB
+lt100KiB=0 # <100 KiB
+lt1MiB=0   # <1 MiB
+lt10MiB=0  # <10 MiB
+lt100MiB=0 # <100 MiB
+lt1GiB=0   # <1 GiB
+ge1GiB=0   # >=1 GiB
+
+raise_error() {
+    echo "Error: $1" >&2
+    exit 1
+}
+
+hashprint() {
+    awk -v count=$1 'BEGIN{for(i=0;i<count;i++) printf "#"}'
+}
+
+# Check if some of the options triggered
+while getopts :i:n opt; do
+    case "$opt" in
+        i) FILE_ERE=$OPTARG;;
+        n) NORMALIZE=true;;
+        *) raise_error "You should use option i with argument or n";;
+    esac
+done
+
+# Shift options by count of readed options
+shift $((OPTIND-1))
+
+# Check if DIR set
+if [ $1 ]; then 
+    ROOT_DIR=`cd $1 && pwd` # Get absolute path to dir
+fi
+
+# If directory does not exist exit program with error
+if [ ! -e $ROOT_DIR ]; then
+    raise_error "Directory $ROOT_DIR does not exist"
+elif [ ! -d $ROOT_DIR ]; then
+    raise_error "$ROOT_DIR is not a directory"
+fi
+
+# If FILE_ERE covers root directory name
+if [ -n $FILE_ERE ] && [ $(basename "$ROOT_DIR" | egrep "$FILE_ERE" >/dev/null) ]; then
+    raise_error "Ignore ERE cannot cover root directory name"
+fi
+
+
+IFS=$'\n'
+
+if [ -z $FILE_ERE ]; then
+    FILES=$(find $ROOT_DIR -type f 2>/dev/null)
+    if [ $? -eq 1 ]; then IS_ERROR=true; fi
+
+    for FILE in $FILES; do
+        ((NF++))
+        fsize=$(wc -c $FILE | awk '{print $1}')
+
+        if [ $fsize -lt 100 ]; then
+            ((lt100B++))
+        elif [ $fsize -lt 1024 ]; then
+            ((lt1KiB++))
+        elif [ $fsize -lt 10240 ]; then
+            ((lt10KiB++))
+        elif [ $fsize -lt 102400 ]; then
+            ((lt100KiB++))
+        elif [ $fsize -lt 1048576 ]; then
+            ((lt1MiB++))
+        elif [ $fsize -lt 10485760 ]; then
+            ((lt10MiB++))
+        elif [ $fsize -lt 104857600 ]; then
+            ((lt100MiB++))
+        elif [ $fsize -lt 1073741824 ]; then
+            ((lt1GiB++))
+        elif [ $fsize -ge 1073741824 ]; then
+            ((ge1GiB++))
+        fi
+    done
+
+    FILES=$(find $ROOT_DIR -type d 2>/dev/null)
+    if [ $? -eq 1 ]; then IS_ERROR=true; fi
+
+    for FILE in $FILES; do
+        ((ND++))
+    done
+fi
+
+# If normalize option triggered
+if [ "$NORMALIZE" = "true" ]
+then
+    MAX_NUM=0
+    COEFF=1
+
+    if [ -t 1 ]; then
+        MAX_COLS=$(($(tput cols) - 12))
+    else
+        MAX_COLS=67
+    fi
+
+    for NUM in $lt100B $lt1KiB $lt10KiB $lt100KiB $lt1MiB $lt10MiB $lt100MiB $lt1GiB $ge1GiB; do
+        if [ $NUM -gt $MAX_NUM ]; then
+            MAX_NUM=$NUM
+        fi
+    done
+
+    if [ $MAX_NUM -gt $MAX_COLS ]; then
+        COEFF=$(echo "$MAX_NUM $MAX_COLS" | awk '{printf $1/$2}')
+    fi
+
+    if [ "$COEFF" != "1" ]; then
+        echo "COEFF: $COEFF"
+        for FILESIZE_NAME in lt100B lt1KiB lt10KiB lt100KiB lt1MiB lt10MiB lt100MiB lt1GiB ge1GiB; do
+            eval $FILESIZE_NAME=$(eval echo '$'$FILESIZE_NAME $COEFF | awk '{printf "%.0f",$1/$2}')
+        done
+    fi
+fi
+
+echo "Root directory: $ROOT_DIR"
+echo "Directories: $ND"
+echo "All files: $NF"
+echo """File size histogram:
+  <100 B  : `hashprint $lt100B`
+  <1 KiB  : `hashprint $lt1KiB`
+  <10 KiB : `hashprint $lt10KiB`
+  <100 KiB: `hashprint $lt100KiB`
+  <1 MiB  : `hashprint $lt1MiB`
+  <10 MiB : `hashprint $lt10MiB`
+  <100 MiB: `hashprint $lt100MiB`
+  <1 GiB  : `hashprint $lt1GiB`
+  >=1 GiB : `hashprint $ge1GiB`"""
+
+if [ "$IS_ERROR" = "true" ]; then
+    exit 1
+fi

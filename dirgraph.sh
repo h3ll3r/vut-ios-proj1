@@ -45,21 +45,3 @@ echo "Directories: $(find -E $root_arg -regex '.*/')"
 echo "All files: $NF"
 
 # echo "File size histogram:"
-# • <100 B
-# -lt 100
-# • <1 KiB
-# -lt 1024
-# • <10 KiB
-# -lt 10240
-# • <100 KiB
-# -lt 102400
-# • <1 MiB
-# -lt 1049000
-# • <10 MiB
-# -lt 10490000
-# • <100 MiB
-# -lt 104900000
-# • <1 GiB
-# -lt 1074000000
-# • >=1 GiB
-# -ge 1074000000
