@@ -1,1 +1,0 @@
-find . -type f | xargs -L1 -I{} basename "{}" | egrep -c 's'
