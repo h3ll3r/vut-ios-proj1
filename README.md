@@ -21,5 +21,5 @@ Options:
 `-n`      Normalize historgram size  
 `-i ERE`  Count only files that match specified Extended Regular Expression
 ```sh
-$ dirgraph -n -i regexp /Users/John/Documents
+$ ./dirgraph -n -i regexp /Users/John/Documents
 ```
