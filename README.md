@@ -1,6 +1,6 @@
 # Operating Systems Project 1
 ## About the project
-`dirgraph` is the utility which scans choosen directory and returns a report in format:
+`dirgraph` is the shell utility which scans choosen directory and returns a report in format:
 ```
 Root directory: path/to/directory
 Directories: 3                      // number of directories inside
